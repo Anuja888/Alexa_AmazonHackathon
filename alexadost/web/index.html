@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AlexaDost – Alexa+ simulator</title>
+<style>
+:root{--bg:#0d1828;--panel:#14243a;--line:#243a58;--text:#e8f0fa;--mute:#8ea4c0;--ring:#2fd1f2;--tool:#ffb547}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font:16px/1.45 "Segoe UI",system-ui,sans-serif;min-height:100vh}
+main{max-width:980px;margin:0 auto;padding:20px;display:grid;gap:20px;grid-template-columns:1fr}
+@media(min-width:860px){main{grid-template-columns:1.1fr .9fr}}
+h1{font-size:1.5rem;margin:0 0 2px}
+.sub{color:var(--mute);margin:0 0 16px}
+.device{display:flex;flex-direction:column;align-items:center;gap:14px;padding:22px;background:var(--panel);border:1px solid var(--line);border-radius:28px}
+.ring{width:120px;height:120px;border-radius:50%;border:7px solid var(--ring);box-shadow:0 0 28px #2fd1f280,inset 0 0 22px #2fd1f240;transition:.25s}
+.ring.listen{animation:pulse 1s infinite}.ring.speak{border-color:#7dffb2;box-shadow:0 0 34px #7dffb280}
+@keyframes pulse{50%{transform:scale(1.07);box-shadow:0 0 44px #2fd1f2}}
+@media(prefers-reduced-motion:reduce){.ring.listen{animation:none}}
+#log{width:100%;height:300px;overflow:auto;display:flex;flex-direction:column;gap:8px;padding:4px}
+.b{max-width:85%;padding:9px 13px;border-radius:16px}
+.u{align-self:flex-end;background:#1d4f7a}.a{align-self:flex-start;background:#1b2f4a;border:1px solid var(--line)}
+form{display:flex;gap:8px;width:100%}
+input{flex:1;padding:12px 14px;border-radius:14px;border:1px solid var(--line);background:#0f1d30;color:var(--text);font:inherit}
+button{padding:11px 15px;border-radius:14px;border:0;background:var(--ring);color:#06202a;font-weight:600;cursor:pointer;font:inherit;font-weight:600}
+button.ghost{background:transparent;color:var(--text);border:1px solid var(--line);font-weight:400}
+:focus-visible{outline:3px solid var(--tool);outline-offset:2px}
+.chips{display:flex;flex-wrap:wrap;gap:7px;width:100%}
+.chips button{font-size:.85rem;padding:6px 11px}
+aside{background:var(--panel);border:1px solid var(--line);border-radius:20px;padding:16px;min-height:200px}
+aside h2{font-size:1rem;margin:0 0 4px}
+.eng{color:var(--mute);font-size:.8rem;margin-bottom:10px}
+.call{border-left:3px solid var(--tool);padding:4px 0 4px 10px;margin:10px 0}
+.call b{color:var(--tool)}
+pre{margin:4px 0 0;white-space:pre-wrap;word-break:break-word;font:12px/1.4 ui-monospace,Consolas,monospace;color:#c8d8ec;max-height:220px;overflow:auto}
+.empty{color:var(--mute)}
+</style>
+</head>
+<body>
+<main>
+<section>
+  <h1>AlexaDost</h1>
+  <p class="sub">A study sidekick for Alexa+, powered by an MCP server.</p>
+  <div class="device">
+    <div class="ring" id="ring" aria-hidden="true"></div>
+    <div id="log" role="log" aria-live="polite"></div>
+    <div class="chips" id="chips"></div>
+    <form id="f"><input id="t" placeholder="Say or type something…" autocomplete="off" aria-label="Message"><button type="button" class="ghost" id="mic">Speak</button><button>Send</button></form>
+  </div>
+</section>
+<aside>
+  <h2>MCP tool calls</h2>
+  <div class="eng" id="eng">Each reply below is produced by a tools/call to the server at /mcp.</div>
+  <div id="calls"><p class="empty">Ask Alexa+ something to see the tool it calls.</p></div>
+</aside>
+</main>
+<script>
+const $=id=>document.getElementById(id),log=$('log'),ring=$('ring');
+const chips=["Give me my briefing","Add a deadline DBMS assignment due friday 4 hours","Add a deadline AIML report due in 3 days 6 hours","Plan my week with 2 hours","Add flashcard what is normalization answer removing data redundancy","Quiz me","Got it","Start a focus session for 25 minutes on DBMS","What are my deadlines"];
+chips.forEach(c=>{const b=document.createElement('button');b.className='ghost';b.type='button';b.textContent=c.length>34?c.slice(0,32)+'…':c;b.title=c;b.onclick=()=>send(c);$('chips').appendChild(b)});
+function bubble(t,c){const d=document.createElement('div');d.className='b '+c;d.textContent=t;log.appendChild(d);log.scrollTop=log.scrollHeight}
+function speak(t){if(!window.speechSynthesis)return;const u=new SpeechSynthesisUtterance(t);ring.className='ring speak';u.onend=()=>ring.className='ring';speechSynthesis.cancel();speechSynthesis.speak(u)}
+function showCalls(d){$('eng').textContent='Engine: '+d.engine+' · MCP server: AlexaDost (spec 2025-11-25, Streamable HTTP)';const el=$('calls');el.innerHTML='';
+ if(!d.tool_calls.length){el.innerHTML='<p class="empty">No tool needed for that.</p>';return}
+ d.tool_calls.forEach(c=>{const w=document.createElement('div');w.className='call';w.innerHTML='<b></b><pre></pre>';w.querySelector('b').textContent='tools/call → '+c.name;w.querySelector('pre').textContent=JSON.stringify({arguments:c.args,result:c.result},null,2);el.appendChild(w)})}
+async function send(text){text=text.trim();if(!text)return;bubble(text,'u');$('t').value='';
+ try{const r=await fetch('/api/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text})});const d=await r.json();bubble(d.reply,'a');showCalls(d);speak(d.reply)}
+ catch(e){bubble('I couldn’t reach the server.','a')}}
+$('f').onsubmit=e=>{e.preventDefault();send($('t').value)};
+const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+if(!SR)$('mic').style.display='none';else $('mic').onclick=()=>{const r=new SR();r.lang='en-US';ring.className='ring listen';r.onresult=e=>send(e.results[0][0].transcript);r.onend=()=>{if(ring.className==='ring listen')ring.className='ring'};r.start()};
+bubble('Hi, I’m Alexa+ with AlexaDost. Ask for your briefing, add a deadline, or say “quiz me”.','a');
+</script>
+</body>
+</html>

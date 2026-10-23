@@ -1,0 +1,5 @@
+mcp>=1.23,<2
+uvicorn>=0.30
+boto3>=1.35
+pytest
+pytest-asyncio
